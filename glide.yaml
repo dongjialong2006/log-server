@@ -1,0 +1,33 @@
+package: log-server
+import:
+- package: github.com/coreos/etcd
+  version: ~3.3.9
+  subpackages:
+  - clientv3
+  - embed
+  - etcdserver/api/v3rpc/rpctypes
+- package: github.com/coreos/pkg
+  version: ~4.0.0
+  subpackages:
+  - capnslog
+- package: github.com/dongjialong2006/log
+- package: github.com/juju/errors
+- package: github.com/namsral/flag
+  version: ~1.7.4-pre
+- package: golang.org/x/net/context
+  repo: https://github.com/golang/net
+- package: golang.org/x/crypto
+  repo: https://github.com/golang/crypto
+- package: golang.org/x/sys
+  repo: https://github.com/golang/sys
+- package: golang.org/x/time
+  repo: https://github.com/golang/time
+- package: google.golang.org/grpc
+  repo: https://github.com/grpc/grpc-go
+- package: google.golang.org/genproto
+  repo: https://github.com/google/go-genproto
+testImport:
+- package: github.com/onsi/ginkgo
+  version: ~1.6.0
+- package: github.com/onsi/gomega
+  version: ~1.4.1

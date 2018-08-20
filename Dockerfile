@@ -6,12 +6,11 @@ MAINTAINER dongchaofeng@b.360.cn
 
 RUN mkdir /app
 
-ADD bin/monitor /app
+ADD bin/log-server /app
 
 ENV LANG en_US.UTF-8
 ENV SIMULATOR_ADDR :56555
-ENV SIMULATOR_LOG ./log/monitor.log
 
 WORKDIR /app
 
-CMD /app/monitor
+CMD /app/log-server

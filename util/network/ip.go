@@ -1,7 +1,6 @@
 package network
 
 import (
-	"agent/types"
 	"fmt"
 	"net"
 )
@@ -38,7 +37,7 @@ func ExternalIP() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf(types.ErrDisconnNetwork)
+	return "", fmt.Errorf("get addr error.")
 }
 
 func getAddr(iface net.Interface) (net.IP, error) {
@@ -68,7 +67,7 @@ func getAddr(iface net.Interface) (net.IP, error) {
 		return ip, nil
 	}
 
-	return nil, fmt.Errorf(types.ErrIPNotFound)
+	return nil, fmt.Errorf("ip not found.")
 }
 
 func GetMacAddr() (string, error) {
@@ -83,5 +82,5 @@ func GetMacAddr() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf(types.ErrMacNotFound)
+	return "", fmt.Errorf("mac not found.")
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log-server/util/etcd"
 	"net/url"
-	//"path"
 	"testing"
 	"time"
 

@@ -17,8 +17,13 @@ import (
 )
 
 func (s *Server) handle(conn net.Conn) {
-	defer conn.Close()
-
+	defer func() {
+		s.log.Infof("conn is disconnected, remote addr:%s.", conn.RemoteAddr().String())
+		if nil != conn {
+			conn.Close()
+		}
+	}()
+	s.log.Infof("new conn received, remote addr:%s.", conn.RemoteAddr().String())
 	br := bufio.NewReader(conn)
 	for {
 		data, err := br.ReadString('\n')
@@ -28,7 +33,13 @@ func (s *Server) handle(conn net.Conn) {
 
 		data = strings.Trim(data, " ")
 		data = strings.Trim(data, "\n")
-		if "" == data {
+		if "" == data || data == "keepalive" {
+			conn.Write([]byte("ok"))
+			continue
+		}
+
+		if data == "keepalive" {
+			conn.Write([]byte("ok"))
 			continue
 		}
 
@@ -93,9 +104,7 @@ func (s *Server) do(data string) error {
 
 	tran, _ := json.Marshal(tmp)
 
-	_, err = s.etcd.Put(s.ctx, fmt.Sprintf("/%s/%s/%s", s.opt.namespace, identity, key), string(tran), clientv3.WithLease(s.grant()))
-
-	return err
+	return s.put(identity, key.(string), string(tran))
 }
 
 func (s *Server) watch(dir string, identity string, separator string) {
@@ -179,7 +188,7 @@ func (s *Server) load(name string, identity string, separator string, info *attr
 	var key string = ""
 	var old string = ""
 	var first bool = true
-	var header bool = false
+	var ok bool = false
 	var commit bool = false
 	var reader = bufio.NewReader(file)
 	for {
@@ -208,28 +217,50 @@ func (s *Server) load(name string, identity string, separator string, info *attr
 			continue
 		}
 
-		key, header = s.key(tmp, separator)
+		keys := s.transfer(tmp, separator)
+		key, ok = keys["time"]
 		if "" == key {
-			continue
-		}
-		if 0 == num {
-			first = header
+			key = time.Now().Format("2006-01-02 15:04:05.00000000")
+		} else {
+			delete(keys, "time")
 		}
 
-		if first && !header {
+		if 0 == num {
+			first = ok
+		}
+
+		if first && !ok {
 			old += tmp
 			commit = true
 			continue
 		}
 
-		if err = s.put(identity, key, tmp); nil != err {
+		temp, err := json.Marshal(keys)
+		if nil != err {
+			s.log.WithField("name", name).Warn(err)
+			continue
+		}
+		if err = s.put(identity, key, string(temp)); nil != err {
 			s.log.WithField("name", name).Warn(err)
 			continue
 		}
 
 		if commit {
-			key, header = s.key(old, separator)
-			if err = s.put(identity, key, old); nil != err {
+			keys = s.transfer(old, separator)
+			key, ok = keys["time"]
+			if "" == key {
+				key = time.Now().Format("2006-01-02 15:04:05.00000000")
+			} else {
+				delete(keys, "time")
+			}
+
+			temp, err = json.Marshal(keys)
+			if nil != err {
+				s.log.WithField("name", name).Warn(err)
+				continue
+			}
+
+			if err = s.put(identity, key, string(temp)); nil != err {
 				s.log.WithField("name", name).Warn(err)
 				continue
 			}
@@ -241,6 +272,42 @@ func (s *Server) load(name string, identity string, separator string, info *attr
 	info.update(num)
 
 	return
+}
+
+func (s *Server) transfer(data string, separator string) map[string]string {
+	var tmp = make(map[string]string)
+	values := strings.Split(data, separator)
+
+	var node string = ""
+	var temp []string = nil
+	for _, value := range values {
+		if "" == value {
+			continue
+		}
+
+		if (strings.Count(value, "\"") % 2) == 0 {
+			temp = append(temp, value)
+			continue
+		}
+		if "" == node {
+			node = value
+		} else {
+			node += value
+			temp = append(temp, node)
+			node = ""
+		}
+	}
+
+	for _, value := range temp {
+		pos := strings.Index(value, "=")
+		if -1 == pos {
+			continue
+		}
+
+		tmp[strings.ToLower(value[:pos])] = value[pos+1:]
+	}
+
+	return tmp
 }
 
 func (s *Server) put(identity, key, value string) error {
@@ -262,28 +329,4 @@ func (s *Server) grant() clientv3.LeaseID {
 	}
 
 	return resp.ID
-}
-
-func (s *Server) key(data string, separator string) (string, bool) {
-	data = strings.ToLower(data)
-	pos := strings.Index(data, "time=")
-	if -1 == pos {
-		return time.Now().Format("2006-01-02 15:04:05.00000000"), false
-	}
-
-	data = data[pos+5:]
-
-	if '"' == data[0] {
-		data = data[1:]
-		pos = strings.Index(data, "\"")
-		return data[:pos], true
-	}
-
-	pos = strings.Index(data, separator)
-	if -1 == pos {
-		s.log.Errorf("data:%s format error.", data)
-		return "", true
-	}
-
-	return data[:pos], true
 }
